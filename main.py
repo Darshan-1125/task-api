@@ -1,11 +1,20 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from contextlib import asynccontextmanager
+from database import create_db_and_tables, engine, Task
+from sqlmodel import Session, select
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
 
 app = FastAPI(
     title="Task API",
     description="A simple CRUD API built using FastAPI.",
-    version="1.0"
+    version="1.0",
+    lifespan=lifespan
 )
 
 # In-memory database (temporary storage)
@@ -49,35 +58,44 @@ def health():
         "status": "ok"
     }
 
-@app.get("/tasks",summary="Get all tasks")
-def task():
-    return tasks
+@app.get("/tasks", summary="Get all tasks")
+def get_tasks():
+    with Session(engine) as session:
+        tasks = session.exec(select(Task)).all()
+        return tasks
 
-@app.get("/tasks/{task_id}",summary="Get a task by ID")
+@app.get("/tasks/{task_id}", summary="Get a task by ID")
 def get_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
-    raise HTTPException(
-    status_code=404,
-    detail=f"Task {task_id} not found"
-    )
+    with Session(engine) as session:
+        task = session.get(Task, task_id)
 
-@app.post("/tasks", status_code=201,summary="Create a new task")
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task {task_id} not found"
+            )
+
+        return task
+
+@app.post("/tasks", status_code=201, summary="Create a new task")
 def create_task(task: TaskCreate):
     if task.title is None or task.title.strip() == "":
         raise HTTPException(
             status_code=400,
             detail="Title cannot be empty"
         )
-    new_id = tasks[-1]["id"] + 1
-    new_task = {
-        "id": new_id,
-        "title": task.title,
-        "done": False
-    }
-    tasks.append(new_task)
-    return new_task
+
+    new_task = Task(
+        title=task.title,
+        done=False
+    )
+
+    with Session(engine) as session:
+        session.add(new_task)
+        session.commit()
+        session.refresh(new_task)
+
+        return new_task
 
 @app.put("/tasks/{task_id}",summary="Update a task")
 def update_task(task_id: int, updated_task: TaskUpdate):
@@ -116,3 +134,4 @@ def delete_task(task_id: int):
         status_code=404,
         detail=f"Task {task_id} not found"
     )
+
