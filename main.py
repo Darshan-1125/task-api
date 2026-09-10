@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from contextlib import asynccontextmanager
+
 from database import create_db_and_tables, engine, Task
 from sqlmodel import Session, select
 
@@ -97,41 +98,57 @@ def create_task(task: TaskCreate):
 
         return new_task
 
-@app.put("/tasks/{task_id}",summary="Update a task")
+@app.put("/tasks/{task_id}", summary="Update a task")
 def update_task(task_id: int, updated_task: TaskUpdate):
-    for task in tasks:
-        if task["id"] == task_id:
-            if updated_task.title.strip() == "":
-                raise HTTPException(
-                    status_code=400,
-                    detail="Title cannot be empty"
-                )
-            if updated_task.title is None or updated_task.title.strip() == "":
-                raise HTTPException(
+    with Session(engine) as session:
+        task = session.get(Task, task_id)
+
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task {task_id} not found"
+            )
+
+        if updated_task.title is None:
+            raise HTTPException(
                 status_code=400,
                 detail="Title is required"
-                )
-            if updated_task.done is None:
-                raise HTTPException(
+            )
+
+        if updated_task.title.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="Title cannot be empty"
+            )
+
+        if updated_task.done is None:
+            raise HTTPException(
                 status_code=400,
                 detail="Done field is required"
-                )
-            task["title"] = updated_task.title
-            task["done"] = updated_task.done
-            return task
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {task_id} not found"
-    )
+            )
 
-@app.delete("/tasks/{task_id}", status_code=204,summary="Delete a task")
+        task.title = updated_task.title
+        task.done = updated_task.done
+
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
+
+@app.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
 def delete_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            tasks.remove(task)
-            return
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {task_id} not found"
-    )
+    with Session(engine) as session:
+        task = session.get(Task, task_id)
+
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task {task_id} not found"
+            )
+
+        session.delete(task)
+        session.commit()
+
+        return
 
