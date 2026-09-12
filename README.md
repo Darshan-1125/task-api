@@ -1,44 +1,48 @@
-# Task API — SQLite Database
+# Task API — FastAPI + PostgreSQL + Docker
 
-A simple CRUD Task API built using Python, FastAPI, Uvicorn, and SQLite.
+A simple CRUD Task API built using **FastAPI**, **SQLModel**, **PostgreSQL**, and **Docker Compose**.
 
-This project is an extension of the previous in-memory Task API. The task data is now stored permanently in a SQLite database.
+This project started as a basic FastAPI CRUD API and was progressively upgraded to use a real PostgreSQL database running inside Docker.
 
-## Technologies Used
+---
 
-- Python
+## Technologies
+
+- Python 3.13
 - FastAPI
-- Uvicorn
+- Pydantic
 - SQLModel
-- SQLite
-- Swagger UI
+- PostgreSQL 17
+- psycopg2
+- Docker
+- Docker Compose
+- Uvicorn
 - Git & GitHub
+- Swagger UI
 
-## Features
+---
 
-- Create tasks
-- Read all tasks
-- Read a task by ID
-- Update tasks
-- Delete tasks
-- SQLite persistent storage
-- Automatic database creation
-- Automatic table creation
-- Three example tasks are inserted when the database is empty
-- Swagger UI for API testing
+## Architecture
 
-## Why SQLite?
-
-SQLite was chosen because it is lightweight and easy to use for a small backend project.
-
-It does not require a separate database server. The entire database is stored in a single file called `tasks.db`.
-
-This makes SQLite useful for learning database concepts and building small applications.
-
-## Database Location
-
-The SQLite database is stored as:
+The application follows a layered architecture:
 
 https://github.com/Darshan-1125/task-api
-tasks.db
-
+Client / Swagger UI
+        |
+        v
+   FastAPI Routes
+      main.py
+        |
+        v
+    TaskService
+     service.py
+        |
+        v
+ PostgresRepository
+repository/postgres_repository.py
+        |
+        v
+    PostgreSQL
+        |
+        v
+ Docker Persistent Volume
